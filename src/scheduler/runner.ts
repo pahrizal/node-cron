@@ -22,6 +22,7 @@ export type RunnerOptions = {
   noOverlap?: boolean,
   timezone?: string,
   maxExecutions?: number,
+  randomDelay?: number,
   maxRandomDelay?: number,
   onMissedExecution?: OnFn,
   onOverlap?: OnFn,
@@ -37,6 +38,7 @@ export class Runner {
   noOverlap: boolean;
   maxExecutions?: number;
   maxRandomDelay: number;
+  randomDelay?: number;
   runCount: number;
 
   running: boolean;
@@ -76,7 +78,10 @@ export class Runner {
 
     const scheduleNextHeartBeat = (currentDate: Date) => {
       if (this.running) {
-          clearTimeout(this.heartBeatTimeout);
+          if (this.heartBeatTimeout) {
+            clearTimeout(this.heartBeatTimeout);
+            this.heartBeatTimeout = undefined;
+          }
           this.heartBeatTimeout = setTimeout(heartBeat, getDelay(this.timeMatcher, currentDate));
       }
     };
@@ -89,11 +94,17 @@ export class Runner {
         }
         
         const shouldExecute = await this.beforeRun(date, execution);
-        const randomDelay = Math.floor(Math.random() * this.maxRandomDelay);
+        const randomDelay = this.randomDelay ?? Math.floor(Math.random() * this.maxRandomDelay);
 
         if(shouldExecute){
           // uses a setTimeout for aplying a jitter
           setTimeout(async () => {
+            // Check if runner is still running to prevent execution after stop
+            if (!this.running) {
+              resolve(true);
+              return;
+            }
+            
             try {
               this.runCount++;
               execution.startedAt = new Date();
@@ -114,6 +125,9 @@ export class Runner {
 
             resolve(true);
           }, randomDelay);
+        } else {
+          // Fix: Always resolve the Promise even when shouldExecute is false
+          resolve(true);
         }
       })
     }
@@ -137,10 +151,22 @@ export class Runner {
 
       // blocking IO detection
       if(expectedNextExecution && expectedNextExecution.getTime() < currentDate.getTime()){
-        while(expectedNextExecution.getTime() < currentDate.getTime()){
+        let missedCount = 0;
+        const maxMissedExecutions = 100; // Prevent infinite loop
+        while(expectedNextExecution.getTime() < currentDate.getTime() && missedCount < maxMissedExecutions){
           logger.warn(`missed execution at ${expectedNextExecution}! Possible blocking IO or high CPU user at the same process used by node-cron.`);
-          expectedNextExecution = this.timeMatcher.getNextMatch(expectedNextExecution);
+          const nextExecution = this.timeMatcher.getNextMatch(expectedNextExecution);
+          // Additional safety check to prevent infinite loop if getNextMatch returns same date
+          if (nextExecution.getTime() <= expectedNextExecution.getTime()) {
+            logger.error('getNextMatch returned same or earlier date, breaking loop to prevent infinite execution');
+            break;
+          }
+          expectedNextExecution = nextExecution;
           runAsync(this.onMissedExecution, expectedNextExecution, defaultOnError);
+          missedCount++;
+        }
+        if (missedCount >= maxMissedExecutions) {
+          logger.error(`Stopped processing missed executions after ${maxMissedExecutions} iterations to prevent infinite loop`);
         }
       }
 
