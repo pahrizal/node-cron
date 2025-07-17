@@ -21,49 +21,24 @@ export class TimeMatcher {
   match(date: Date) {
     const localizedTime = new LocalizedTime(date, this.timezone);
     const parts = localizedTime.getParts();
-    if (this.expressions.length === 7) {
-      const runOnMillisecond = this.expressions[0].some(
-        (x) => parts.milisecond >= x
-      );
-      const runOnSecond = matchValue(this.expressions[1], parts.second);
-      const runOnMinute = matchValue(this.expressions[2], parts.minute);
-      const runOnHour = matchValue(this.expressions[3], parts.hour);
-      const runOnDay = matchValue(this.expressions[4], parts.day);
-      const runOnMonth = matchValue(this.expressions[5], parts.month);
-      const runOnWeekDay = matchValue(
-        this.expressions[6],
-        parseInt(weekDayNamesConversion(parts.weekday))
-      );
+    const runOnSecond = matchValue(this.expressions[0], parts.second);
+    const runOnMinute = matchValue(this.expressions[1], parts.minute);
+    const runOnHour = matchValue(this.expressions[2], parts.hour);
+    const runOnDay = matchValue(this.expressions[3], parts.day);
+    const runOnMonth = matchValue(this.expressions[4], parts.month);
+    const runOnWeekDay = matchValue(
+      this.expressions[5],
+      parseInt(weekDayNamesConversion(parts.weekday))
+    );
 
-      return (
-        runOnMillisecond &&
-        runOnSecond &&
-        runOnMinute &&
-        runOnHour &&
-        runOnDay &&
-        runOnMonth &&
-        runOnWeekDay
-      );
-    } else {
-      const runOnSecond = matchValue(this.expressions[0], parts.second);
-      const runOnMinute = matchValue(this.expressions[1], parts.minute);
-      const runOnHour = matchValue(this.expressions[2], parts.hour);
-      const runOnDay = matchValue(this.expressions[3], parts.day);
-      const runOnMonth = matchValue(this.expressions[4], parts.month);
-      const runOnWeekDay = matchValue(
-        this.expressions[5],
-        parseInt(weekDayNamesConversion(parts.weekday))
-      );
-
-      return (
-        runOnSecond &&
-        runOnMinute &&
-        runOnHour &&
-        runOnDay &&
-        runOnMonth &&
-        runOnWeekDay
-      );
-    }
+    return (
+      runOnSecond &&
+      runOnMinute &&
+      runOnHour &&
+      runOnDay &&
+      runOnMonth &&
+      runOnWeekDay
+    );
   }
 
   getNextMatch(date: Date) {
